@@ -13,7 +13,7 @@ class FFNN:
     def __init__(self, layer_sizes: list, 
                  activations: list, 
                  learning_rate=0.01, 
-                 epochs=10, 
+                 epochs=100, 
                  batch_size=32, 
                  l1_lambda=0.0, 
                  l2_lambda=0.0, 
