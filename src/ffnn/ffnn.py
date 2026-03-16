@@ -6,10 +6,12 @@ try:
     from .layer import Layer
     from .autodiff import Node
     from . import losses
+    from .optimizer import AdamOptimizer
 except ImportError:
     from layer import Layer
     from autodiff import Node
     import losses
+    from optimizer import AdamOptimizer
 
 class FFNN:
     def __init__(self, layer_sizes: list, 
@@ -21,11 +23,16 @@ class FFNN:
                  l2_lambda=0.0, 
                  verbose=1,
                  init_method="random_normal", 
-                 **init_params):
+                 optimizer="sgd",
+                 **kwargs):
         """
         layer_sizes: List jumlah neuron (contoh: [3 (input), 5 (hidden), 2 (output)])
         activations: List nama fungsi aktivasi (contoh: ["relu", "softmax"])
         """
+        init_keys = {"seed", "lower_bound", "upper_bound", "mean", "std"}
+        init_params = {k: v for k, v in kwargs.items() if k in init_keys}
+        optimizer_params = {k: v for k, v in kwargs.items() if k not in init_keys}
+        
         if len(layer_sizes) - 1 != len(activations):
             raise ValueError("Jumlah fungsi aktivasi tidak sama dengan jumlah transisi layer, cek kembali")
         
@@ -40,13 +47,19 @@ class FFNN:
         self.l2_lambda = l2_lambda
         self.verbose = verbose
         
-        for i in range(0, len(layer_sizes) - 1):
-            n_in = layer_sizes[i]
-            n_out = layer_sizes[i+1]
-            act_func = activations[i]
-            
-            layer = Layer(n_in, n_out, act_func, init_method, **init_params)
+        for i in range(len(layer_sizes) - 1):
+            layer = Layer(layer_sizes[i], layer_sizes[i+1], activations[i], init_method, **init_params)
             self.layers.append(layer)
+
+        if optimizer == "adam":
+            self.optimizer = AdamOptimizer(
+                learning_rate=optimizer_params.get("learning_rate", learning_rate),
+                beta1=optimizer_params.get("beta1", 0.9),
+                beta2=optimizer_params.get("beta2", 0.999),
+                epsilon=optimizer_params.get("epsilon", 1e-8)
+            )
+        else:
+            self.optimizer = None
 
 
     def forward(self, X):
@@ -86,11 +99,13 @@ class FFNN:
         return reg_loss
     
     def updateWeights(self):
-        """Menggunakan self.learning_rate yang diset di __init__"""
         params = self.getParameters()
-        for p in params:
-            p.data -= self.learning_rate * p.grad
-            p.grad = np.zeros_like(p.data)
+        if self.optimizer is not None:
+            self.optimizer.update(params)
+        else:
+            for p in params:
+                p.data -= self.learning_rate * p.grad
+                p.grad = np.zeros_like(p.data)
         
     def _calculate_accuracy(self, y_true, y_pred_probs):
         labels_true = np.argmax(y_true, axis=1)
