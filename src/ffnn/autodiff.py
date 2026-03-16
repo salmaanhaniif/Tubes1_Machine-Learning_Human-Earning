@@ -73,7 +73,6 @@ class Node:
         return out
 
     def tanh(self):
-        # Memanggil tanh_fn sesuai nama fungsi di file activations.py milikmu
         out = Node(act.tanh_fn(self.data), (self,))
         def _backward():
             self.grad += act.d_tanh(self.data) * out.grad
@@ -87,7 +86,6 @@ class Node:
         out._backward = _backward
         return out
 
-    # Fungsi aktivasi bonus
     def swish(self):
         out = Node(act.swish(self.data), (self,))
         def _backward():
@@ -99,6 +97,25 @@ class Node:
         out = Node(act.leaky_relu(self.data, alpha), (self,))
         def _backward():
             self.grad += act.d_leaky_relu(self.data, alpha) * out.grad
+        out._backward = _backward
+        return out
+
+    def rms_norm(self, epsilon=1e-8):
+        """Root Mean Square Normalization untuk stabilitas sinyal"""
+        # 1. Forward Pass
+        mean_sq = np.mean(self.data ** 2, axis=1, keepdims=True)
+        rms = np.sqrt(mean_sq + epsilon)
+        normalized_data = self.data / rms
+        out = Node(normalized_data, (self,))
+        
+        # 2. Backward Pass
+        def _backward():
+            D = self.data.shape[1] 
+            sum_dy_x = np.sum(out.grad * self.data, axis=1, keepdims=True)
+            term1 = out.grad / rms
+            term2 = (self.data / (D * (rms ** 3))) * sum_dy_x
+            self.grad += (term1 - term2)
+            
         out._backward = _backward
         return out
 
