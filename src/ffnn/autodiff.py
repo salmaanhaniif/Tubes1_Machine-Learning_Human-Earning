@@ -82,7 +82,9 @@ class Node:
     def softmax(self):
         out = Node(act.softmax(self.data), (self,))
         def _backward():
-            self.grad += act.d_softmax(self.data) * out.grad
+            s = act.softmax(self.data)
+            dot = np.sum(out.grad * s, axis=-1, keepdims=True)
+            self.grad += s * (out.grad - dot)
         out._backward = _backward
         return out
 
