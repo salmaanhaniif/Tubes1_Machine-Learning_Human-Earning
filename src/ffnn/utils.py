@@ -13,7 +13,7 @@ def plot_history(history):
     # Plot Loss
     plt.subplot(1, 2, 1)
     plt.plot(epochs, history['train_loss'], 'b-o', label='Training Loss')
-    if history['val_loss'] is not None:
+    if history['val_loss']:
         plt.plot(epochs, history['val_loss'], 'r-o', label='Validation Loss')
     plt.title('Kurva Loss (Training vs Validation)')
     plt.xlabel('Epochs')
