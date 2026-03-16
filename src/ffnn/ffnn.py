@@ -6,6 +6,7 @@ try:
     from . import losses
     from .layer import Layer
     from .autodiff import Node
+    from .optimizer import AdamOptimizer
 except ImportError:
     import losses
     from layer import Layer
@@ -20,7 +21,10 @@ class FFNN:
                  l1_lambda=0.0, 
                  l2_lambda=0.0, 
                  verbose=1,
-                 init_method="random_normal", 
+                 init_method="random_normal",
+                 loss="cce", 
+                 optimizer="sgd",
+                 use_rms_norm = False,
                  **init_params):
         """
         layer_sizes: List jumlah neuron (contoh: [3 (input), 5 (hidden), 2 (output)])
@@ -39,14 +43,27 @@ class FFNN:
         self.l1_lambda = l1_lambda
         self.l2_lambda = l2_lambda
         self.verbose = verbose
+        self.loss = loss
+        self.optimizer_name = optimizer
+        self.adam = AdamOptimizer if optimizer == "adam" else None
+        self.use_rms_norm = use_rms_norm
         
         for i in range(0, len(layer_sizes) - 1):
             n_in = layer_sizes[i]
             n_out = layer_sizes[i+1]
             act_func = activations[i]
             
-            layer = Layer(n_in, n_out, act_func, init_method, **init_params)
+            layer = Layer(n_in, n_out, act_func, init_method, use_rms_norm=use_rms_norm, **init_params)
             self.layers.append(layer)
+    
+    def _compute_loss(self, y_true, y_pred_node):
+        from_softmax = self.activations[-1] == 'softmax'
+        if self.loss == "mse":
+            return losses.mse(y_true, y_pred_node)
+        elif self.loss == "bce":
+            return losses.binaryCrossentropy(y_true, y_pred_node)
+        else:  # cce default
+            return losses.categoricalCrossentropy(y_true, y_pred_node, from_softmax=from_softmax)
 
 
     def forward(self, X):
@@ -88,9 +105,12 @@ class FFNN:
     def updateWeights(self):
         """Menggunakan self.learning_rate yang diset di __init__"""
         params = self.getParameters()
-        for p in params:
-            p.data -= self.learning_rate * p.grad
-            p.grad = np.zeros_like(p.data)
+        if self.optimizer_name == "adam":
+            self.adam.update(params)
+        else:
+            for p in params:
+                p.data -= self.learning_rate * p.grad
+                p.grad = np.zeros_like(p.data)
         
     def _calculate_accuracy(self, y_true, y_pred_probs):
         labels_true = np.argmax(y_true, axis=1)
@@ -123,8 +143,7 @@ class FFNN:
                 # Forward -> Loss -> Backward
                 output = self.forward(X_batch)
                 
-                from_softmax = self.activations[-1] == 'softmax'
-                loss_node = losses.categoricalCrossentropy(y_batch, output, from_softmax=from_softmax)
+                loss_node = self._compute_loss(y_batch, output)
                 
                 loss_node.backward()
                 
@@ -145,7 +164,7 @@ class FFNN:
             val_info = ""
             if X_val is not None and y_val is not None:
                 val_out = self.predict(X_val)
-                v_loss = losses.categoricalCrossentropy(y_val, Node(val_out)).data
+                v_loss = self._compute_loss(y_val, Node(val_out)).data
                 v_acc = self._calculate_accuracy(y_val, val_out)
                 history['val_loss'].append(v_loss)
                 history['val_acc'].append(v_acc)
