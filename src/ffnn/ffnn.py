@@ -3,36 +3,29 @@ import pickle
 import matplotlib.pyplot as plt
 
 try:
+    from . import losses
     from .layer import Layer
     from .autodiff import Node
-    from . import losses
-    from .optimizer import AdamOptimizer
 except ImportError:
+    import losses
     from layer import Layer
     from autodiff import Node
-    import losses
-    from optimizer import AdamOptimizer
 
 class FFNN:
     def __init__(self, layer_sizes: list, 
                  activations: list, 
                  learning_rate=0.01, 
-                 epochs=100, 
+                 epochs=10, 
                  batch_size=32, 
                  l1_lambda=0.0, 
                  l2_lambda=0.0, 
                  verbose=1,
                  init_method="random_normal", 
-                 optimizer="sgd",
-                 **kwargs):
+                 **init_params):
         """
         layer_sizes: List jumlah neuron (contoh: [3 (input), 5 (hidden), 2 (output)])
         activations: List nama fungsi aktivasi (contoh: ["relu", "softmax"])
         """
-        init_keys = {"seed", "lower_bound", "upper_bound", "mean", "std"}
-        init_params = {k: v for k, v in kwargs.items() if k in init_keys}
-        optimizer_params = {k: v for k, v in kwargs.items() if k not in init_keys}
-        
         if len(layer_sizes) - 1 != len(activations):
             raise ValueError("Jumlah fungsi aktivasi tidak sama dengan jumlah transisi layer, cek kembali")
         
@@ -47,19 +40,13 @@ class FFNN:
         self.l2_lambda = l2_lambda
         self.verbose = verbose
         
-        for i in range(len(layer_sizes) - 1):
-            layer = Layer(layer_sizes[i], layer_sizes[i+1], activations[i], init_method, **init_params)
+        for i in range(0, len(layer_sizes) - 1):
+            n_in = layer_sizes[i]
+            n_out = layer_sizes[i+1]
+            act_func = activations[i]
+            
+            layer = Layer(n_in, n_out, act_func, init_method, **init_params)
             self.layers.append(layer)
-
-        if optimizer == "adam":
-            self.optimizer = AdamOptimizer(
-                learning_rate=optimizer_params.get("learning_rate", learning_rate),
-                beta1=optimizer_params.get("beta1", 0.9),
-                beta2=optimizer_params.get("beta2", 0.999),
-                epsilon=optimizer_params.get("epsilon", 1e-8)
-            )
-        else:
-            self.optimizer = None
 
 
     def forward(self, X):
@@ -99,13 +86,11 @@ class FFNN:
         return reg_loss
     
     def updateWeights(self):
+        """Menggunakan self.learning_rate yang diset di __init__"""
         params = self.getParameters()
-        if self.optimizer is not None:
-            self.optimizer.update(params)
-        else:
-            for p in params:
-                p.data -= self.learning_rate * p.grad
-                p.grad = np.zeros_like(p.data)
+        for p in params:
+            p.data -= self.learning_rate * p.grad
+            p.grad = np.zeros_like(p.data)
         
     def _calculate_accuracy(self, y_true, y_pred_probs):
         labels_true = np.argmax(y_true, axis=1)
@@ -174,14 +159,85 @@ class FFNN:
         return history
 
     # Fungsi untuk visualisasi distribusi bobot dan gradien setelah pelatihan
-    # Tolong dibuat dalam format persebaran dan rata-rata karena jumlah layer biasanya sangat banyak
+    # Dibuat dalam format persebaran dan rata-rata karena jumlah layer biasanya sangat 
     
-
     def display_weight_distribution(self, target_layers: list):
-        pass
+        """
+        Menampilkan statistik dasar (Min, Max, Rata-rata, Std Dev)
+        dari bobot (W) dan bias (b) pada layer yang dipilih.
+        """
+        # Cetak judul tabel secara manual agar bentuknya langsung terlihat
+        print("\n=================================================================")
+        print("               DISTRIBUSI BOBOT (WEIGHTS) & BIAS                 ")
+        print("=================================================================")
+        print("Layer   | Param | Min        | Max        | Mean       | Std       ")
+        print("-----------------------------------------------------------------")
+        
+        for layer_idx in target_layers:
+            idx = layer_idx - 1 
+            if idx < 0 or idx >= len(self.layers):
+                continue
+                
+            # Ambil data parameter
+            w_data = self.layers[idx].W.data
+            b_data = self.layers[idx].b.data
+            
+            # Hitung Statistik Bobot (W)
+            w_min = np.min(w_data)
+            w_max = np.max(w_data)
+            w_mean = np.mean(w_data)
+            w_std = np.std(w_data)
+            
+            # Cetak baris Bobot (Format .4f artinya 4 angka di belakang koma, <10 artinya spasi 10 karakter)
+            print(f"{layer_idx:<7} | W     | {w_min:<10.4f} | {w_max:<10.4f} | {w_mean:<10.4f} | {w_std:<10.4f}")
+            
+            # Hitung Statistik Bias (b)
+            b_min = np.min(b_data)
+            b_max = np.max(b_data)
+            b_mean = np.mean(b_data)
+            b_std = np.std(b_data)
+            
+            # Cetak baris Bias (Dikosongkan bagian nama layer agar rapi)
+            print(f"        | b     | {b_min:<10.4f} | {b_max:<10.4f} | {b_mean:<10.4f} | {b_std:<10.4f}")
+            print("-----------------------------------------------------------------")
+
 
     def display_gradient_distribution(self, target_layers: list):
-        pass
+        """
+        Menampilkan statistik dasar dari sinyal error (gradien) 
+        yang diterima oleh bobot dan bias saat proses backward.
+        """
+        print("\n=================================================================")
+        print("               DISTRIBUSI GRADIEN (ERROR SIGNAL)                 ")
+        print("=================================================================")
+        print("Layer   | Param | Min        | Max        | Mean       | Std       ")
+        print("-----------------------------------------------------------------")
+        
+        for layer_idx in target_layers:
+            idx = layer_idx - 1 
+            if idx < 0 or idx >= len(self.layers):
+                continue
+                
+            # Ambil data gradien
+            w_grad = self.layers[idx].W.grad
+            b_grad = self.layers[idx].b.grad
+            
+            # Hitung Statistik Gradien Bobot (dW)
+            dw_min = np.min(w_grad)
+            dw_max = np.max(w_grad)
+            dw_mean = np.mean(w_grad)
+            dw_std = np.std(w_grad)
+            
+            print(f"{layer_idx:<7} | dW    | {dw_min:<10.4f} | {dw_max:<10.4f} | {dw_mean:<10.4f} | {dw_std:<10.4f}")
+            
+            # Hitung Statistik Gradien Bias (db)
+            db_min = np.min(b_grad)
+            db_max = np.max(b_grad)
+            db_mean = np.mean(b_grad)
+            db_std = np.std(b_grad)
+            
+            print(f"        | db    | {db_min:<10.4f} | {db_max:<10.4f} | {db_mean:<10.4f} | {db_std:<10.4f}")
+            print("-----------------------------------------------------------------")
 
     # Save & Load model
     def saveModel(self, filepath="model.pkl"):
