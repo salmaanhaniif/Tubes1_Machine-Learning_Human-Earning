@@ -219,6 +219,19 @@ class FFNN:
             # Cetak baris Bias (Dikosongkan bagian nama layer agar rapi)
             print(f"        | b     | {b_min:<10.4f} | {b_max:<10.4f} | {b_mean:<10.4f} | {b_std:<10.4f}")
             print("-----------------------------------------------------------------")
+        
+        fig, axes = plt.subplots(len(target_layers), 2, figsize=(12, 4 * len(target_layers)))
+        if len(target_layers) == 1:
+            axes = [axes]
+        for i, layer_idx in enumerate(target_layers):
+            idx = layer_idx - 1
+            if idx < 0 or idx >= len(self.layers): continue
+            axes[i][0].hist(self.layers[idx].W.data.flatten(), bins=30)
+            axes[i][0].set_title(f'Layer {layer_idx} - Weight (W)')
+            axes[i][1].hist(self.layers[idx].b.data.flatten(), bins=30)
+            axes[i][1].set_title(f'Layer {layer_idx} - Bias (b)')
+        plt.tight_layout()
+        plt.show()
 
 
     def display_gradient_distribution(self, target_layers: list):
@@ -257,6 +270,19 @@ class FFNN:
             
             print(f"        | db    | {db_min:<10.4f} | {db_max:<10.4f} | {db_mean:<10.4f} | {db_std:<10.4f}")
             print("-----------------------------------------------------------------")
+        
+        fig, axes = plt.subplots(len(target_layers), 2, figsize=(12, 4 * len(target_layers)))
+        if len(target_layers) == 1:
+            axes = [axes]
+        for i, layer_idx in enumerate(target_layers):
+            idx = layer_idx - 1
+            if idx < 0 or idx >= len(self.layers): continue
+            axes[i][0].hist(self.layers[idx].W.grad.flatten(), bins=30)
+            axes[i][0].set_title(f'Layer {layer_idx} - Weight (W)')
+            axes[i][1].hist(self.layers[idx].b.grad.flatten(), bins=30)
+            axes[i][1].set_title(f'Layer {layer_idx} - Bias (b)')
+        plt.tight_layout()
+        plt.show()
 
     # Save & Load model
     def saveModel(self, filepath="model.pkl"):
