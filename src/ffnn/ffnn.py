@@ -45,7 +45,7 @@ class FFNN:
         self.verbose = verbose
         self.loss = loss
         self.optimizer_name = optimizer
-        self.adam = AdamOptimizer if optimizer == "adam" else None
+        self.adam = AdamOptimizer() if optimizer == "adam" else None
         self.use_rms_norm = use_rms_norm
         
         for i in range(0, len(layer_sizes) - 1):
