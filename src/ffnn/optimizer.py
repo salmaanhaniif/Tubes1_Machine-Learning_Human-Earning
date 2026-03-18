@@ -25,4 +25,5 @@ class AdamOptimizer:
             v_hat = self.v[i] / (1 - self.beta2 ** self.t)
 
             p.data -= self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
+            p.last_grad = p.grad.copy()
             p.grad = np.zeros_like(p.data)

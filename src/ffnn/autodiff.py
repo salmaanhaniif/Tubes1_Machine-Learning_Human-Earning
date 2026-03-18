@@ -13,6 +13,7 @@ class Node:
         else: self.data = data
 
         self.grad = np.zeros_like(self.data, dtype=np.float64) # init gradien dengan nilai 0 di awal
+        self.last_grad = np.zeros_like(self.data, dtype=np.float64)
         # Fungsi mundur bawaan (kosong) dan pelacakan parent
         self._backward = lambda: None
         self._prev = set(_children)

@@ -110,6 +110,7 @@ class FFNN:
         else:
             for p in params:
                 p.data -= self.learning_rate * p.grad
+                p.last_grad = p.grad.copy()
                 p.grad = np.zeros_like(p.data)
         
     def _calculate_accuracy(self, y_true, y_pred_probs):
@@ -151,7 +152,7 @@ class FFNN:
                 reg_l = self.applyRegularization()
                 self.updateWeights()
 
-                epoch_loss += (loss_node.data + reg_l)
+                epoch_loss += loss_node.data
                 epoch_acc += self._calculate_accuracy(y_batch, output.data)
 
             # Record Statistics
@@ -251,8 +252,8 @@ class FFNN:
                 continue
                 
             # Ambil data gradien
-            w_grad = self.layers[idx].W.grad
-            b_grad = self.layers[idx].b.grad
+            w_grad = self.layers[idx].W.last_grad
+            b_grad = self.layers[idx].b.last_grad
             
             # Hitung Statistik Gradien Bobot (dW)
             dw_min = np.min(w_grad)
@@ -277,9 +278,9 @@ class FFNN:
         for i, layer_idx in enumerate(target_layers):
             idx = layer_idx - 1
             if idx < 0 or idx >= len(self.layers): continue
-            axes[i][0].hist(self.layers[idx].W.grad.flatten(), bins=30)
+            axes[i][0].hist(self.layers[idx].W.last_grad.flatten(), bins=30)
             axes[i][0].set_title(f'Layer {layer_idx} - Weight (W)')
-            axes[i][1].hist(self.layers[idx].b.grad.flatten(), bins=30)
+            axes[i][1].hist(self.layers[idx].b.last_grad.flatten(), bins=30)
             axes[i][1].set_title(f'Layer {layer_idx} - Bias (b)')
         plt.tight_layout()
         plt.show()
